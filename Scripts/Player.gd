@@ -1,20 +1,36 @@
 extends KinematicBody2D
 class_name Player
 
+enum {
+	MOVE,
+	CLIMB
+}
+
 export(Resource) var movementData
 
 var velocity = Vector2.ZERO
+var state = MOVE
 
 onready var animatedSprite: AnimatedSprite = $Sprite
+onready var ladderCheck: RayCast2D = $LadderCheck
 
 func _ready() -> void:
 	pass
 
 func _physics_process(delta: float) -> void:
-	apply_gravity()
 	var input = Vector2.ZERO
-	input.x = Input.get_action_strength("ui_right") - Input.get_action_strength("ui_left")
+	input.x = Input.get_axis("ui_left", "ui_right")
+	input.y = Input.get_axis("ui_up", "ui_down")
 	
+	match state:
+		MOVE: move_state(input)
+		CLIMB: climb_state(input)
+
+func move_state(input: Vector2):
+	if is_on_ladder() and Input.is_action_pressed("ui_up"):
+		state = CLIMB
+		
+	apply_gravity()
 	if input.x == 0:
 		apply_friction()
 		animatedSprite.animation = "Idle"
@@ -40,7 +56,28 @@ func _physics_process(delta: float) -> void:
 	if is_on_floor() and was_in_air:
 		animatedSprite.animation = "Run"
 		animatedSprite.frame = 1
+	
+func climb_state(input: Vector2):
+	if not is_on_ladder():
+		state = MOVE
+
+	if input.length() != 0:
+		animatedSprite.animation = "Run"
+	else:
+		animatedSprite.animation = "Idle"
 		
+	velocity = input * 50
+	velocity = move_and_slide(velocity, Vector2.UP)
+
+func is_on_ladder() -> bool:
+	if not ladderCheck.is_colliding():
+		return false
+	
+	var collider = ladderCheck.get_collider()
+	if not collider is Ladder:
+		return false
+		
+	return true
 
 func apply_gravity() -> void:
 	velocity.y += movementData.GRAVITY
